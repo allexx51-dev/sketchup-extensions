@@ -1,0 +1,6 @@
+[
+  { "key": "longi_410", "model": "LONGi Hi-MO 5 410W", "l": 1722, "w": 1134, "t": 30, "p": 410 },
+  { "key": "ja_455", "model": "JA Solar JAM72S20 455W", "l": 2112, "w": 1052, "t": 35, "p": 455 },
+  { "key": "trina_550", "model": "Trina Vertex 550W", "l": 2384, "w": 1096, "t": 35, "p": 550 },
+  { "key": "jinko_585", "model": "Jinko Tiger Neo 585W", "l": 2278, "w": 1134, "t": 30, "p": 585 }
+]

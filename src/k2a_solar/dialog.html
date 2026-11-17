@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>K2A Солнечные панели</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+      margin: 0;
+      padding: 12px;
+      font-size: 12.5px;
+    }
+    h2 { font-size: 13px; margin: 0 0 8px 0; color: #0f172a; }
+    .section {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 9px;
+    }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 3px;
+    }
+    input[type="text"], input[type="number"], select {
+      width: 100%;
+      padding: 5px 7px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      font-size: 12px;
+      background: #ffffff;
+      color: #0f172a;
+    }
+    .seg {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      background: #f1f5f9;
+      padding: 3px;
+      border-radius: 5px;
+    }
+    .seg button {
+      border: none;
+      background: transparent;
+      padding: 5px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+      cursor: pointer;
+    }
+    .seg button.active {
+      background: #ffffff;
+      color: #005f9e;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #1e293b;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+    .btn-primary {
+      grid-column: 1 / -1;
+      background: #005f9e;
+      color: #ffffff;
+      border: none;
+      border-radius: 5px;
+      padding: 9px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-primary:hover { background: #004b7d; }
+    .btn-secondary {
+      background: #ffffff;
+      color: #0f172a;
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-secondary:hover { background: #f1f5f9; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { padding: 4px; border-bottom: 1px solid #f1f5f9; text-align: left; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+    .hint { font-size: 11px; color: #64748b; margin-top: 5px; line-height: 1.35; }
+  </style>
+</head>
+<body>
+  <div class="section">
+    <h2>1. Модель и габариты панели</h2>
+    <div style="margin-bottom: 7px;">
+      <label for="preset">Пресет модели</label>
+      <select id="preset" onchange="applyPreset()">
+        <option value="longi_410" selected>LONGi Hi-MO 5 410W (1722×1134×30)</option>
+        <option value="ja_455" >JA Solar 455W (2112×1052×35)</option>
+        <option value="trina_550" >Trina Vertex 550W (2384×1096×35)</option>
+        <option value="jinko_585" >Jinko Tiger Neo 585W (2278×1134×30)</option>
+        <option value="custom" >Своя модель</option>
+      </select>
+    </div>
+    <div class="grid-2" style="margin-bottom: 7px;">
+      <div>
+        <label for="panelModel">Название модели</label>
+        <input id="panelModel" type="text" value="LONGi Hi-MO 5 410W" />
+      </div>
+      <div>
+        <label for="powerW">Мощность (Вт)</label>
+        <input id="powerW" type="number" value="410" min="0" />
+      </div>
+    </div>
+    <div class="grid-3">
+      <div>
+        <label for="lengthMm">Длина (мм)</label>
+        <input id="lengthMm" type="number" value="1722" min="200" />
+      </div>
+      <div>
+        <label for="widthMm">Ширина (мм)</label>
+        <input id="widthMm" type="number" value="1134" min="200" />
+      </div>
+      <div>
+        <label for="thicknessMm">Толщина (мм)</label>
+        <input id="thicknessMm" type="number" value="30" min="10" />
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>2. Ориентация, наклон и тень по солнцу</h2>
+    <div class="seg" style="margin-bottom: 7px;">
+      <button type="button" id="btnPortrait" class="active" onclick="setOrientation('portrait')">Книга (Portrait)</button>
+      <button type="button" id="btnLandscape" class="" onclick="setOrientation('landscape')">Альбом (Landscape)</button>
+    </div>
+
+    <div class="grid-3" style="margin-bottom: 7px;">
+      <div style="grid-column: span 2;">
+        <label for="tiltMode">Режим наклона</label>
+        <select id="tiltMode" onchange="toggleInputs()">
+          <option value="flush" >Прилегание к плоскости крыши</option>
+          <option value="roof_tilt" >Наклон от плоскости крыши</option>
+          <option value="ground_tilt" selected>Наклон от плоскости земли</option>
+        </select>
+      </div>
+      <div>
+        <label for="tiltDeg">Угол (°)</label>
+        <input id="tiltDeg" type="number" value="30" min="0" max="75" />
+      </div>
+    </div>
+
+    <div class="grid-3" style="margin-bottom: 7px;">
+      <div style="grid-column: span 2;">
+        <label for="rowGapMode">Шаг между рядами</label>
+        <select id="rowGapMode" onchange="toggleInputs()">
+          <option value="solar_shadow" selected>По солнцу (21 дек., в расчётном окне)</option>
+          <option value="manual" >Задать зазор вручную</option>
+        </select>
+      </div>
+      <div>
+        <label for="latitudeDeg">Широта (°)</label>
+        <input id="latitudeDeg" type="number" step="0.1" value="47.8" min="0" max="75" />
+      </div>
+    </div>
+
+    <div class="grid-3" style="margin-bottom: 7px;">
+      <div>
+        <label for="windowStartH">Окно с (ч, солн.)</label>
+        <input id="windowStartH" type="number" step="0.5" value="10" min="6" max="12" />
+      </div>
+      <div>
+        <label for="windowEndH">Окно до (ч, солн.)</label>
+        <input id="windowEndH" type="number" step="0.5" value="14" min="12" max="18" />
+      </div>
+      <div>
+        <label>Север модели</label>
+        <input id="northInfo" type="text" value="—" disabled />
+      </div>
+    </div>
+
+    <div class="grid-3" style="margin-bottom: 7px;">
+      <div style="grid-column: span 2;">
+        <label for="rowOrientMode">Ряды на плоской кровле</label>
+        <select id="rowOrientMode" onchange="toggleInputs()">
+          <option value="edge" selected>Вдоль ребра (выделенного или самого длинного)</option>
+          <option value="cardinal">По сторонам света (панели на юг)</option>
+          <option value="azimuth">Задать азимут панелей</option>
+        </select>
+      </div>
+      <div>
+        <label for="rowAzimuthDeg">Азимут (°, юг = 180)</label>
+        <input id="rowAzimuthDeg" type="number" step="1" value="180" min="0" max="360" />
+      </div>
+    </div>
+
+    <div class="grid-3">
+      <div>
+        <label for="gapUMm">В ряду (мм)</label>
+        <input id="gapUMm" type="number" value="20" min="0" />
+      </div>
+      <div>
+        <label for="gapVMm">Между рядами</label>
+        <input id="gapVMm" type="number" value="250" min="0" />
+      </div>
+      <div>
+        <label for="edgeMarginMm">От края (мм)</label>
+        <input id="edgeMarginMm" type="number" value="300" min="0" />
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>3. Обход препятствий и тип крепления</h2>
+    <div class="grid-2" style="margin-bottom: 7px;">
+      <div>
+        <label for="mountType">Система крепления</label>
+        <select id="mountType" onchange="onMountChange()">
+          <option value="rail_clamp" selected>SolarSet — скатная, профиль</option>
+          <option value="ballast">Balast Південь — плоская</option>
+          <option value="ballast_ew">Balast Схід-Захід — плоская</option>
+          <option value="ground">Landing — наземная</option>
+          <option value="block">Block — беспрофильная, профнастил</option>
+        </select>
+      </div>
+      <div>
+        <label for="obstacleClearanceMm">Зазор от дымоходов (мм)</label>
+        <input id="obstacleClearanceMm" type="number" value="300" min="0" />
+      </div>
+    </div>
+
+    <label class="check">
+      <input id="includeMounting" type="checkbox" checked />
+      <span>Строить 3D профиль, прижимы и опоры / балластные блоки</span>
+    </label>
+
+    <div class="grid-3" id="railParams">
+      <div>
+        <label for="standoffMm">Зазор кровли (мм)</label>
+        <input id="standoffMm" type="number" value="110" min="20" />
+      </div>
+      <div>
+        <label for="railProfile">Профиль</label>
+        <select id="railProfile">
+          <option value="al_ld" selected>Al LD Anod</option>
+          <option value="g41">G41 цинк</option>
+        </select>
+      </div>
+      <div>
+        <label for="bracketStepMm">Шаг опор (мм)</label>
+        <input id="bracketStepMm" type="number" value="1200" min="300" />
+      </div>
+    </div>
+
+    <div class="grid-3" style="margin-top: 7px;">
+      <div>
+        <label for="railDir">Укладка профиля</label>
+        <select id="railDir">
+          <option value="along" selected>Вдоль ряда</option>
+          <option value="across">Поперёк ряда</option>
+        </select>
+      </div>
+      <div>
+        <label for="rowsPerStrip">Рядов в полосе</label>
+        <input id="rowsPerStrip" type="number" value="1" min="1" max="10" onchange="toggleInputs()" />
+      </div>
+      <div>
+        <label for="aisleMm">Проход (мм)</label>
+        <input id="aisleMm" type="number" value="1150" min="0" />
+      </div>
+    </div>
+
+    <div id="anchorParams" style="margin-top: 7px;">
+      <label for="anchorType">Крепление профиля к кровле</label>
+      <select id="anchorType" onchange="onAnchorChange()">
+        <option value="l45" selected>Кронштейн L45а-Met М10х200 (шпилька-шуруп)</option>
+        <option value="tbit">Кронштейн Tbit-2 Al (битумная черепица)</option>
+        <option value="ubit">Кронштейн Ubit Al (деревянное основание)</option>
+        <option value="falz">Клемник фальца</option>
+        <option value="hook">Крюк А2 под керамическую черепицу</option>
+        <option value="screw">Саморезы в профнастил, без кронштейна</option>
+      </select>
+    </div>
+
+    <div class="grid-3" id="ballastParams" style="margin-top: 7px;">
+      <div>
+        <label for="ballastAngleDeg">Треугольник (°)</label>
+        <select id="ballastAngleDeg" onchange="onMountChange()">
+          <option value="15" selected>15</option>
+          <option value="20">20</option>
+        </select>
+      </div>
+      <div>
+        <label for="ballastWeightKg">Вес блока (кг)</label>
+        <input id="ballastWeightKg" type="number" step="0.01" value="13.06" min="1" />
+      </div>
+      <div>
+        <label for="ballastPerJoint">Блоков на треуг.</label>
+        <input id="ballastPerJoint" type="number" value="2" min="2" max="3" />
+      </div>
+    </div>
+
+    <input id="ballastLengthMm" type="hidden" value="300" />
+    <input id="ballastWidthMm" type="hidden" value="300" />
+    <input id="ballastHeightMm" type="hidden" value="60" />
+    <input id="railOverhangMm" type="hidden" value="45" />
+
+    <div class="actions">
+      <button type="button" class="btn-primary" onclick="placeArray()">Разместить на выбранной крыше / скатах</button>
+      <button type="button" class="btn-secondary" onclick="refreshBom()">Обновить спецификацию</button>
+      <button type="button" class="btn-secondary" onclick="exportCsv()">Скачать CSV (Excel)</button>
+      <button type="button" class="btn-secondary" onclick="callSu('add_panel_tool')">Добавить панель вручную</button>
+      <button type="button" class="btn-secondary" onclick="callSu('rebuild_mounting')">Пересобрать крепёж</button>
+    </div>
+    <div class="hint" id="placementReport" style="color:#0f172a; white-space:pre-line;"></div>
+    <div class="hint" id="configDirNote"></div>
+    <div class="hint" id="staleNote" style="color:#b45309;"></div>
+    <div class="hint">Ручная правка: выделите массив (группу «PV_Скат…»), «Добавить панель вручную» — щелчки по скату; панель прилипает к ряду и соседям. Удалили или передвинули панели внутри группы — «Пересобрать крепёж».</div>
+    <div class="hint">Полосы: «Рядов в полосе» больше 1 — ряды ставятся группами с зазором «Между рядами», между группами — «Проход». «Поперёк ряда» — два профиля под каждой стопкой панелей вдоль ската; для панелей без наклона к кровле. «Шаг опор» при саморезах — шаг точек крепления (по умолчанию 700 мм), один саморез на точку, под каждый — 50 мм битумной ленты.</div>
+    <div class="hint">Системы RUDNIK. SolarSet: два профиля на ряд из стандартных отрезков 1230–3100 мм. Balast Південь: панель альбомом на трёх треугольниках, по 2 блока на треугольник, спойлер, сполучники; зазор между рядами — «Между рядами», по умолчанию 700 мм. Balast Схід-Захід: ячейка — «домик» из двух панелей; нормы расхода по аналогии, поставщиком не подтверждены. Landing: стол из двух панелей книгой по высоте, наклон 30°, рамы с шагом не больше 2800 мм, консоль прогона 825 мм. Block: панель лежит без наклона на блоках L 310 высотой 50 мм под каждой точкой прижима, две линии на ряд; заклёпок 4 на блок и лента под блок — допущение. Балластные — только на плоской кровле; ветровая нагрузка не считается.</div>
+    <div class="hint">Окно задаётся в солнечном времени: 12 — истинный полдень. «С 12 до 12» — расчёт только на полдень. Скат с уклоном до 5° считается плоской кровлей.</div>
+    <div class="hint">Выделите один или несколько скатов крыши (Shift + клик) либо группу крыши целиком. Дымоходы и трубы на крыше плагин обойдёт автоматически.</div>
+  </div>
+
+  <div class="section">
+    <h2>4. Спецификация по модели</h2>
+    <table>
+      <tbody id="bomBody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    var currentOrientation = 'portrait';
+    var PRESETS = {
+      longi_410: { model: 'LONGi Hi-MO 5 410W', l: 1722, w: 1134, t: 30, p: 410 },
+      ja_455: { model: 'JA Solar JAM72S20 455W', l: 2112, w: 1052, t: 35, p: 455 },
+      trina_550: { model: 'Trina Vertex 550W', l: 2384, w: 1096, t: 35, p: 550 },
+      jinko_585: { model: 'Jinko Tiger Neo 585W', l: 2278, w: 1134, t: 30, p: 585 }
+    };
+
+    function applyPreset() {
+      var key = document.getElementById('preset').value;
+      var p = PRESETS[key];
+      if (!p) return;
+      document.getElementById('panelModel').value = p.model;
+      document.getElementById('lengthMm').value = p.l;
+      document.getElementById('widthMm').value = p.w;
+      document.getElementById('thicknessMm').value = p.t;
+      document.getElementById('powerW').value = p.p;
+    }
+
+    function setOrientation(mode) {
+      currentOrientation = mode;
+      document.getElementById('btnPortrait').className = mode === 'portrait' ? 'active' : '';
+      document.getElementById('btnLandscape').className = mode === 'landscape' ? 'active' : '';
+    }
+
+    function toggleInputs() {
+      var tiltMode = document.getElementById('tiltMode').value;
+      document.getElementById('tiltDeg').disabled = (tiltMode === 'flush');
+
+      var rowMode = document.getElementById('rowGapMode').value;
+      document.getElementById('latitudeDeg').disabled = (rowMode !== 'solar_shadow');
+      document.getElementById('gapVMm').disabled = (rowMode === 'solar_shadow' && tiltMode !== 'flush');
+      document.getElementById('windowStartH').disabled = (rowMode !== 'solar_shadow');
+      document.getElementById('windowEndH').disabled = (rowMode !== 'solar_shadow');
+      document.getElementById('rowAzimuthDeg').disabled = (document.getElementById('rowOrientMode').value !== 'azimuth');
+
+      var mountType = document.getElementById('mountType').value;
+      var isBallast = (mountType === 'ballast' || mountType === 'ballast_ew');
+      document.getElementById('ballastParams').style.display = isBallast ? 'grid' : 'none';
+      document.getElementById('anchorParams').style.display = (mountType === 'rail_clamp') ? 'block' : 'none';
+      document.getElementById('railProfile').disabled = (mountType !== 'rail_clamp');
+      document.getElementById('railDir').disabled = (mountType !== 'rail_clamp');
+      document.getElementById('aisleMm').disabled = (parseInt(document.getElementById('rowsPerStrip').value, 10) <= 1);
+      document.getElementById('bracketStepMm').disabled = (mountType !== 'rail_clamp');
+      document.getElementById('ballastPerJoint').disabled = (mountType !== 'ballast');
+    }
+
+    // Балластная система задаёт свои значения: альбом, наклон по треугольнику, зазор рядов 700 мм
+    function onMountChange() {
+      var m = document.getElementById('mountType').value;
+      if (m === 'ballast' || m === 'ballast_ew') {
+        setOrientation('landscape');
+        document.getElementById('tiltMode').value = 'ground_tilt';
+        document.getElementById('tiltDeg').value = document.getElementById('ballastAngleDeg').value;
+        document.getElementById('rowGapMode').value = 'manual';
+        document.getElementById('gapVMm').value = 700;
+      } else if (m === 'block') {
+        document.getElementById('tiltMode').value = 'flush';
+        document.getElementById('standoffMm').value = 50;
+      } else if (m === 'ground') {
+        setOrientation('portrait');
+        document.getElementById('tiltMode').value = 'ground_tilt';
+        document.getElementById('tiltDeg').value = 30;
+        document.getElementById('rowGapMode').value = 'solar_shadow';
+      }
+      toggleInputs();
+    }
+
+    // Саморезы в профнастил: шаг точек крепления 700 мм
+    function onAnchorChange() {
+      if (document.getElementById('anchorType').value === 'screw') {
+        document.getElementById('bracketStepMm').value = 700;
+      }
+    }
+
+    function placeArray() {
+      var payload = {
+        panelModel: document.getElementById('panelModel').value,
+        lengthMm: parseFloat(document.getElementById('lengthMm').value),
+        widthMm: parseFloat(document.getElementById('widthMm').value),
+        thicknessMm: parseFloat(document.getElementById('thicknessMm').value),
+        powerW: parseFloat(document.getElementById('powerW').value),
+        orientation: currentOrientation,
+        gapUMm: parseFloat(document.getElementById('gapUMm').value),
+        rowGapMode: document.getElementById('rowGapMode').value,
+        gapVMm: parseFloat(document.getElementById('gapVMm').value),
+        latitudeDeg: parseFloat(document.getElementById('latitudeDeg').value),
+        windowStartH: parseFloat(document.getElementById('windowStartH').value),
+        windowEndH: parseFloat(document.getElementById('windowEndH').value),
+        rowOrientMode: document.getElementById('rowOrientMode').value,
+        rowAzimuthDeg: parseFloat(document.getElementById('rowAzimuthDeg').value),
+        edgeMarginMm: parseFloat(document.getElementById('edgeMarginMm').value),
+        obstacleClearanceMm: parseFloat(document.getElementById('obstacleClearanceMm').value),
+        tiltMode: document.getElementById('tiltMode').value,
+        tiltDeg: parseFloat(document.getElementById('tiltDeg').value),
+        standoffMm: parseFloat(document.getElementById('standoffMm').value),
+        mountType: document.getElementById('mountType').value,
+        includeMounting: document.getElementById('includeMounting').checked,
+        railProfile: document.getElementById('railProfile').value,
+        anchorType: document.getElementById('anchorType').value,
+        railDir: document.getElementById('railDir').value,
+        rowsPerStrip: parseInt(document.getElementById('rowsPerStrip').value, 10),
+        aisleMm: parseFloat(document.getElementById('aisleMm').value),
+        bracketStepMm: parseFloat(document.getElementById('bracketStepMm').value),
+        railOverhangMm: parseFloat(document.getElementById('railOverhangMm').value),
+        ballastLengthMm: parseFloat(document.getElementById('ballastLengthMm').value),
+        ballastWidthMm: parseFloat(document.getElementById('ballastWidthMm').value),
+        ballastHeightMm: parseFloat(document.getElementById('ballastHeightMm').value),
+        ballastWeightKg: parseFloat(document.getElementById('ballastWeightKg').value),
+        ballastPerJoint: parseInt(document.getElementById('ballastPerJoint').value, 10),
+        ballastAngleDeg: parseInt(document.getElementById('ballastAngleDeg').value, 10)
+      };
+      if (window.sketchup && window.sketchup.place_array) {
+        window.sketchup.place_array(JSON.stringify(payload));
+      }
+    }
+
+    function refreshBom() {
+      if (window.sketchup && window.sketchup.recalculate_bom) {
+        window.sketchup.recalculate_bom();
+      }
+    }
+
+    function callSu(name) {
+      if (window.sketchup && window.sketchup[name]) {
+        window.sketchup[name]();
+      }
+    }
+
+    function exportCsv() {
+      if (window.sketchup && window.sketchup.export_csv) {
+        window.sketchup.export_csv();
+      }
+    }
+
+    window.setModelInfo = function(info) {
+      if (!info) return;
+      if (info.panels && info.panels.length) {
+        var sel = document.getElementById('preset');
+        PRESETS = {};
+        sel.innerHTML = '';
+        info.panels.forEach(function(p, i) {
+          var key = p.key || ('panel_' + i);
+          PRESETS[key] = p;
+          var opt = document.createElement('option');
+          opt.value = key;
+          opt.textContent = p.model + ' (' + p.l + '×' + p.w + '×' + p.t + ')';
+          sel.appendChild(opt);
+        });
+        var custom = document.createElement('option');
+        custom.value = 'custom';
+        custom.textContent = 'Своя модель';
+        sel.appendChild(custom);
+        sel.selectedIndex = 0;
+        applyPreset();
+      }
+      if (info.configDir) {
+        document.getElementById('configDirNote').textContent =
+          'База панелей (panels.json) и названия позиций спецификации (nomenclature.json): ' + info.configDir;
+      }
+      document.getElementById('northInfo').value = (info.northAngle || 0) + '° от оси Y';
+      if (info.georeferenced && info.latitude > 0 && info.latitude <= 75) {
+        document.getElementById('latitudeDeg').value = info.latitude;
+      }
+    };
+
+    window.showPlacementReport = function(lines) {
+      document.getElementById('placementReport').textContent = (lines || []).join('\n');
+    };
+
+    window.updateBomFromSketchUp = function(bom) {
+      if (!bom) return;
+      var notes = [];
+      if (bom.staleCount) notes.push('Массивов, изменённых вручную: ' + bom.staleCount + '. Нажмите «Пересобрать крепёж».');
+      if (bom.legacyCount) notes.push('Массивов старых версий без состава крепежа: ' + bom.legacyCount + '. Нажмите «Пересобрать крепёж» или разместите заново.');
+      document.getElementById('staleNote').textContent = notes.join(' ');
+
+      var body = document.getElementById('bomBody');
+      body.innerHTML = '';
+      function addRow(name, value) {
+        var tr = document.createElement('tr');
+        var a = document.createElement('td');
+        a.textContent = name;
+        var b = document.createElement('td');
+        b.className = 'num';
+        b.textContent = value;
+        tr.appendChild(a);
+        tr.appendChild(b);
+        body.appendChild(tr);
+      }
+      addRow('Панели (все массивы)', (bom.panelsCount || 0) + ' шт');
+      addRow('Суммарная мощность', (bom.powerKw || 0) + ' кВт');
+      (bom.lines || []).forEach(function(l) { addRow(l.name, l.qty + ' ' + l.unit); });
+      addRow('Масса конструкции (крепёж и балласт, детали с известной массой)', (bom.structureKg || 0) + ' кг');
+    };
+
+    onMountChange();
+    if (window.sketchup && window.sketchup.ready) {
+      window.sketchup.ready();
+    }
+  </script>
+</body>
+</html>
