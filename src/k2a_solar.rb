@@ -8,7 +8,7 @@ module K2A
     unless file_loaded?(__FILE__)
       ex = SketchupExtension.new('K2A Солнечные панели', 'k2a_solar/main')
       ex.description = 'Расстановка солнечных панелей на скаты крыши, плоскую кровлю и землю: обход дымоходов и препятствий, зазор между рядами по солнцу, профиль, прижимы, балласт и спецификация.'
-      ex.version     = '1.10.0'
+      ex.version     = '1.10.1'
       ex.creator     = 'Алексей (allexx51-dev)'
       ex.copyright   = '© 2026 allexx51-dev · MIT'
       Sketchup.register_extension(ex, true)

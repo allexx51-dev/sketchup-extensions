@@ -9,7 +9,7 @@ require_relative 'mounting'
 
 module K2A
   module SolarPlanner
-    VERSION = '1.10.0'
+    VERSION = '1.10.1'
     # Ключи данных прежние (были до переименования в K2A): по ним живут уже сделанные модели и настройки
     ATTR_DICT = 'SolarTools_SolarPlanner'
     # Скат с уклоном меньше этого считается плоской кровлей: направление рядов задаётся режимом
@@ -83,7 +83,14 @@ module K2A
       @dialog.add_action_callback('recalculate_bom') { |_ctx| send_model_bom }
       @dialog.add_action_callback('export_csv') { |_ctx| export_bom_to_csv }
       @dialog.add_action_callback('add_panel_tool') { |_ctx| start_add_panel_tool }
-      @dialog.add_action_callback('rebuild_mounting') { |_ctx| rebuild_selected_arrays }
+      @dialog.add_action_callback('rebuild_mounting') do |_ctx, json_payload|
+        params = begin
+          json_payload.to_s.empty? ? nil : JSON.parse(json_payload.to_s)
+        rescue JSON::ParserError
+          nil
+        end
+        rebuild_selected_arrays(params)
+      end
 
       @dialog.show
     end
@@ -757,27 +764,113 @@ module K2A
       model.selection.grep(Sketchup::Group).select { |grp| grp.get_attribute(ATTR_DICT, 'cfg_json') }
     end
 
-    def self.rebuild_selected_arrays
+    # Настройки крепежа из окна, которые меняются без перерасстановки панелей.
+    # Ограничения — те же, что при расстановке (place_solar_arrays).
+    def self.mount_settings(params)
+      {
+        'mount' => %w[ballast ballast_ew ground block].include?(params['mountType'].to_s) ? params['mountType'].to_s : 'rail_clamp',
+        'includeMounting' => params['includeMounting'] == true,
+        'profile' => params['railProfile'].to_s == 'g41' ? 'g41' : 'al_ld',
+        'anchor' => %w[l45 tbit ubit falz hook screw].include?(params['anchorType'].to_s) ? params['anchorType'].to_s : 'l45',
+        'railDir' => params['railDir'].to_s == 'across' ? 'across' : 'along',
+        'bracketStepMm' => [params['bracketStepMm'].to_f, 300.0].max,
+        'railOverhangMm' => [params['railOverhangMm'].to_f, 0.0].max,
+        'standoffMm' => [params['standoffMm'].to_f, 20.0].max,
+        'ballastLMm' => [params['ballastLengthMm'].to_f, 100.0].max,
+        'ballastWMm' => [params['ballastWidthMm'].to_f, 80.0].max,
+        'ballastHMm' => [params['ballastHeightMm'].to_f, 30.0].max,
+        'ballastWtKg' => [params['ballastWeightKg'].to_f, 1.0].max,
+        'ballastPerJoint' => [[params['ballastPerJoint'].to_i, 2].max, 3].min
+      }
+    end
+
+    # Смена системы без перерасстановки возможна, только если панели остаются теми же и там же по скату:
+    # скатная ↔ Block при панелях без наклона. У балластных и наземной своя ячейка, ориентация и наклон.
+    # Возвращает nil, если можно, иначе — причину.
+    def self.mount_switch_problem(cfg, new_mount)
+      old_mount = cfg['mount'].to_s
+      return nil if old_mount == new_mount
+
+      flat = %w[rail_clamp block]
+      unless flat.include?(old_mount) && flat.include?(new_mount)
+        return "смена «#{SYSTEM_LABELS[old_mount] || old_mount}» → «#{SYSTEM_LABELS[new_mount] || new_mount}» меняет раскладку панелей"
+      end
+      if new_mount == 'block' && cfg['localTiltDeg'].to_f.abs > 0.01
+        return "#{SYSTEM_LABELS['block']} — только для панелей без наклона, а здесь наклон #{cfg['localTiltDeg'].to_f.round(1)}°"
+      end
+
+      nil
+    end
+
+    # Применить настройки окна к массиву: cfg обновляется, панели сдвигаются по нормали,
+    # если поменялась высота над кровлей (зазор кровли, высота балластного блока, Block).
+    def self.apply_mount_settings(group, cfg, settings)
+      old_geom = array_geom(cfg)
+      cells = array_cells(group, cfg, old_geom)
+      new_cfg = cfg.merge(settings)
+      new_cfg['standoffMm'] = BLOCK_H_MM if new_cfg['mount'] == 'block'
+      new_cfg['standoffMm'] = GROUND_LOW_EDGE_MM if new_cfg['mount'] == 'ground'
+      new_geom = array_geom(new_cfg)
+      if (new_geom[:base_z] - old_geom[:base_z]).abs > 0.01
+        panel_instances(group).zip(cells).each do |inst, cell|
+          inst.transformation = panel_transform(new_geom, new_cfg, cell[:u0], cell[:v0])
+        end
+      end
+      group.set_attribute(ATTR_DICT, 'cfg_json', JSON.generate(new_cfg))
+      new_cfg
+    end
+
+    # Пересборка крепежа. С настройками окна (params) — по ним: система (в пределах mount_switch_problem),
+    # профиль, крепление, шаг опор, зазор кровли, балласт. Настройки окна применяются к выделенным массивам,
+    # а если не выделено ничего — к единственному массиву модели; при нескольких невыделенных каждый
+    # пересобирается по своим сохранённым настройкам.
+    def self.rebuild_selected_arrays(params = nil)
       model = Sketchup.active_model
       return unless model
 
       arrays = selected_arrays(model)
-      arrays = arrays_with_cfg(model) if arrays.empty?
+      apply = !arrays.empty?
+      if arrays.empty?
+        arrays = arrays_with_cfg(model)
+        apply = arrays.length == 1
+      end
       if arrays.empty?
         UI.messagebox('Нет массивов, которые можно пересобрать. Массивы, созданные версиями до 1.4.0, нужно разместить заново.')
         return
       end
+      settings = params && apply ? mount_settings(params) : nil
 
+      report = []
       model.start_operation('Пересобрать крепёж', true)
       begin
-        arrays.each { |grp| rebuild_array(model, grp) }
+        arrays.each do |grp|
+          if settings
+            cfg = array_cfg(grp)
+            problem = cfg && mount_switch_problem(cfg, settings['mount'])
+            if problem
+              report << "#{grp.name}: не пересобран — #{problem}. Разместите массив заново (выделите скат, «Разместить» заменит панели)."
+              next
+            end
+            old_mount = cfg['mount'].to_s
+            apply_mount_settings(grp, cfg, settings) if cfg
+            rebuild_array(model, grp)
+            changed = old_mount == settings['mount'] ? '' : " (система: #{SYSTEM_LABELS[settings['mount']]})"
+            report << "Пересобран крепёж по настройкам окна: #{grp.name}#{changed}"
+          else
+            rebuild_array(model, grp)
+            report << "Пересобран крепёж по сохранённым настройкам: #{grp.name}"
+          end
+        end
         model.commit_operation
       rescue StandardError => e
         model.abort_operation
         UI.messagebox("Ошибка при пересборке крепежа:\n#{e.message}")
         return
       end
-      send_report(arrays.map { |grp| "Пересобран крепёж: #{grp.name}" })
+      if params && !apply
+        report << 'Настройки окна не применены: массивов несколько, а выделенных нет. Выделите массивы, к которым их применить.'
+      end
+      send_report(report)
       send_model_bom
     end
 
