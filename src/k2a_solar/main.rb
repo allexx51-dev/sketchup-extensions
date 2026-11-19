@@ -9,7 +9,7 @@ require_relative 'mounting'
 
 module K2A
   module SolarPlanner
-    VERSION = '1.11.0'
+    VERSION = '1.11.1'
     # Ключи данных прежние (были до переименования в K2A): по ним живут уже сделанные модели и настройки
     ATTR_DICT = 'SolarTools_SolarPlanner'
     # Скат с уклоном меньше этого считается плоской кровлей: направление рядов задаётся режимом

@@ -49,9 +49,15 @@ module K2A
       cfg['railLines'].to_i == 3 ? [0.22, 0.5, 0.78] : [0.22, 0.78]
     end
 
-    # Кронштейн L45: нержавеющий под алюминиевый профиль, оцинкованный под G41 (прайс RUDNIK)
+    # Исполнение кронштейна по профилю (прайс RUDNIK): L45 — нержавеющий под Al LD, оцинкованный под G41;
+    # крюк и клемник фальца — высотой 95 под Al LD, 45 под G41
     def self.anchor_subs(anchor, profile)
-      anchor == 'l45' ? { 'mat' => profile == 'g41' ? 'оц' : 'нерж' } : {}
+      g41 = profile == 'g41'
+      case anchor
+      when 'l45' then { 'mat' => g41 ? 'оц' : 'нерж' }
+      when 'hook', 'falz' then { 'h' => g41 ? '45' : '95' }
+      else {}
+      end
     end
 
     def self.add_line(bom, key, qty, unit, subs = {})
@@ -636,9 +642,15 @@ module K2A
       subs = line['subs'] || {}
       p = entry['price']
       if entry['by']
+        table = entry['prices'] || {}
         v = subs[entry['by']]
         v = v.to_i if v.is_a?(Float) && v == v.round # угол 15.0 -> «15»
-        p = (entry['prices'] || {})[v.to_s]
+        p = table[v.to_s]
+        # Числовой ключ без точного совпадения — ближайший больший: рама 32 мм -> прижим 35
+        if p.nil? && v.is_a?(Numeric)
+          up = table.keys.select { |k| k.to_s =~ /\A\d+(\.\d+)?\z/ && k.to_f >= v }.min_by(&:to_f)
+          p = table[up] if up
+        end
       end
       return nil unless p.is_a?(Numeric)
 

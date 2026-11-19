@@ -1,6 +1,6 @@
 {
   "_version": 1,
-  "_comment": "Цены позиций спецификации, $ за единицу. Здесь цифр нет: файл с ценами загружается кнопкой «Загрузить прайс…» в окне и хранится в папке настроек пользователя; обновление расширения его не затирает. Ключи — как в nomenclature.json. per: м — за метр (у отрезков профиля цена умножается на длину отрезка); pack — длина рулона в метрах, считается целыми рулонами. by — цена зависит от подстановки (angle — угол треугольника, mat — нерж/оц). Позиции с price: null в сумму не входят.",
+  "_comment": "Цены позиций спецификации, $ за единицу. Здесь цифр нет: файл с ценами загружается кнопкой «Загрузить прайс…» в окне и хранится в папке настроек пользователя; обновление расширения его не затирает. Ключи — как в nomenclature.json. per: м — за метр (у отрезков профиля цена умножается на длину отрезка); pack — длина рулона в метрах, считается целыми рулонами. by — цена зависит от подстановки (t — толщина рамы панели, прижим Z30/Z35; angle — угол треугольника; mat — нерж/оц; h — высота кронштейна). Позиции с price: null в сумму не входят.",
   "_source": "",
   "railPiece.al_ld": {
     "price": null,
@@ -17,16 +17,32 @@
     "price": null
   },
   "clampZ.al_ld": {
-    "price": null
+    "by": "t",
+    "prices": {
+      "30": null,
+      "35": null
+    }
   },
   "clampP.al_ld": {
-    "price": null
+    "by": "t",
+    "prices": {
+      "30": null,
+      "35": null
+    }
   },
   "clampZ.g41": {
-    "price": null
+    "by": "t",
+    "prices": {
+      "30": null,
+      "35": null
+    }
   },
   "clampP.g41": {
-    "price": null
+    "by": "t",
+    "prices": {
+      "30": null,
+      "35": null
+    }
   },
   "anchor.l45": {
     "by": "mat",
@@ -42,10 +58,18 @@
     "price": null
   },
   "anchor.falz": {
-    "price": null
+    "by": "h",
+    "prices": {
+      "95": null,
+      "45": null
+    }
   },
   "anchor.hook": {
-    "price": null
+    "by": "h",
+    "prices": {
+      "95": null,
+      "45": null
+    }
   },
   "tape": {
     "price": null,
@@ -56,10 +80,18 @@
     "price": null
   },
   "clampZ.block": {
-    "price": null
+    "by": "t",
+    "prices": {
+      "30": null,
+      "35": null
+    }
   },
   "clampP.block": {
-    "price": null
+    "by": "t",
+    "prices": {
+      "30": null,
+      "35": null
+    }
   },
   "rivet": {
     "price": null
@@ -79,10 +111,18 @@
     }
   },
   "clampZ.bal": {
-    "price": null
+    "by": "t",
+    "prices": {
+      "30": null,
+      "35": null
+    }
   },
   "clampW.bal": {
-    "price": null
+    "by": "t",
+    "prices": {
+      "30": null,
+      "35": null
+    }
   },
   "spoiler": {
     "price": null
@@ -113,9 +153,17 @@
     "price": null
   },
   "clampZ.ground": {
-    "price": null
+    "by": "t",
+    "prices": {
+      "30": null,
+      "35": null
+    }
   },
   "clampP.ground": {
-    "price": null
+    "by": "t",
+    "prices": {
+      "30": null,
+      "35": null
+    }
   }
 }
