@@ -283,6 +283,14 @@
       </div>
     </div>
 
+    <div style="margin-top: 7px;">
+      <label for="railLines">Линий профиля в ряду</label>
+      <select id="railLines">
+        <option value="2" selected>2 — обычная схема</option>
+        <option value="3">3 — дополнительная линия посередине панели</option>
+      </select>
+    </div>
+
     <div id="anchorParams" style="margin-top: 7px;">
       <label for="anchorType">Крепление профиля к кровле</label>
       <select id="anchorType" onchange="onAnchorChange()">
@@ -329,8 +337,8 @@
     <div class="hint" id="configDirNote"></div>
     <div class="hint" id="staleNote" style="color:#b45309;"></div>
     <div class="hint">Ручная правка: выделите массив (группу «PV_Скат…»), «Добавить панель вручную» — щелчки по скату; панель прилипает к ряду и соседям. Удалили или передвинули панели внутри группы — «Пересобрать крепёж».</div>
-    <div class="hint">«Пересобрать крепёж» берёт настройки системы из окна: систему, профиль, крепление, шаг опор, зазор кровли, балласт — для выделенных массивов (или единственного в модели). Систему так можно сменить только между скатной и Block при панелях без наклона; переход на балластную или наземную меняет раскладку — массив нужно разместить заново.</div>
-    <div class="hint">Полосы: «Рядов в полосе» больше 1 — ряды ставятся группами с зазором «Между рядами», между группами — «Проход». «Поперёк ряда» — два профиля под каждой стопкой панелей вдоль ската; для панелей без наклона к кровле. «Шаг опор» при саморезах — шаг точек крепления (по умолчанию 700 мм), один саморез на точку, под каждый — 50 мм битумной ленты.</div>
+    <div class="hint">«Пересобрать крепёж» берёт настройки системы из окна: систему, профиль, число линий профиля, крепление, шаг опор, зазор кровли, балласт — для выделенных массивов (или единственного в модели). Систему так можно сменить только между скатной и Block при панелях без наклона; переход на балластную или наземную меняет раскладку — массив нужно разместить заново.</div>
+    <div class="hint">Полосы: «Рядов в полосе» больше 1 — ряды ставятся группами с зазором «Между рядами», между группами — «Проход». «Поперёк ряда» — два профиля под каждой стопкой панелей вдоль ската; для панелей без наклона к кровле. «Линий профиля: 3» — третья линия посередине панели, с прижимами и опорами, при любой укладке. «Шаг опор» при саморезах — шаг точек крепления (по умолчанию 700 мм), один саморез на точку, под каждый — 50 мм битумной ленты.</div>
     <div class="hint">Системы RUDNIK. SolarSet: два профиля на ряд из стандартных отрезков 1230–3100 мм. Balast Південь: панель альбомом на трёх треугольниках, по 2 блока на треугольник, спойлер, сполучники; зазор между рядами — «Между рядами», по умолчанию 700 мм. Balast Схід-Захід: ячейка — «домик» из двух панелей; нормы расхода по аналогии, поставщиком не подтверждены. Landing: стол из двух панелей книгой по высоте, наклон 30°, рамы с шагом не больше 2800 мм, консоль прогона 825 мм. Block: панель лежит без наклона на блоках L 310 высотой 50 мм под каждой точкой прижима, две линии на ряд; заклёпок 4 на блок и лента под блок — допущение. Балластные — только на плоской кровле; ветровая нагрузка не считается.</div>
     <div class="hint">Окно задаётся в солнечном времени: 12 — истинный полдень. «С 12 до 12» — расчёт только на полдень. Скат с уклоном до 5° считается плоской кровлей.</div>
     <div class="hint">Выделите один или несколько скатов крыши (Shift + клик) либо группу крыши целиком. Дымоходы и трубы на крыше плагин обойдёт автоматически.</div>
@@ -386,6 +394,7 @@
       document.getElementById('anchorParams').style.display = (mountType === 'rail_clamp') ? 'block' : 'none';
       document.getElementById('railProfile').disabled = (mountType !== 'rail_clamp');
       document.getElementById('railDir').disabled = (mountType !== 'rail_clamp');
+      document.getElementById('railLines').disabled = (mountType !== 'rail_clamp');
       document.getElementById('aisleMm').disabled = (parseInt(document.getElementById('rowsPerStrip').value, 10) <= 1);
       document.getElementById('bracketStepMm').disabled = (mountType !== 'rail_clamp');
       document.getElementById('ballastPerJoint').disabled = (mountType !== 'ballast');
@@ -445,6 +454,7 @@
         railProfile: document.getElementById('railProfile').value,
         anchorType: document.getElementById('anchorType').value,
         railDir: document.getElementById('railDir').value,
+        railLines: parseInt(document.getElementById('railLines').value, 10),
         rowsPerStrip: parseInt(document.getElementById('rowsPerStrip').value, 10),
         aisleMm: parseFloat(document.getElementById('aisleMm').value),
         bracketStepMm: parseFloat(document.getElementById('bracketStepMm').value),

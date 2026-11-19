@@ -32,6 +32,22 @@ module K2A
       clamp: 0.082, clamp_bal: 0.073, anchor_tbit: 0.186, triangle_south: 3.54,
       row_connector: 0.98, spoiler: 2.14
     }.freeze
+    # Прижимы оцинкованные под G41 — масса по данным поставщика; у алюминиевого профиля — общая 0,082
+    CLAMP_KG = { 'g41' => { z: 0.080, p: 0.089 } }.freeze
+    # Кронштейны: масса по данным поставщика; у остальных креплений неизвестна — в массу не входят
+    ANCHOR_KG = { 'l45' => 0.21, 'tbit' => 0.186 }.freeze
+
+    # Масса прижимов линии профиля: два Z на концах и n_mid П между панелями
+    def self.clamps_kg(profile, n_mid)
+      kg = CLAMP_KG[profile]
+      kg ? 2 * kg[:z] + n_mid * kg[:p] : (n_mid + 2) * PART_KG[:clamp]
+    end
+
+    # Линии профиля под панелью — доли размера панели поперёк профиля.
+    # Две — обычная схема; три — дополнительная линия посередине (снег, ветер, длинные панели).
+    def self.rail_ratios(cfg)
+      cfg['railLines'].to_i == 3 ? [0.22, 0.5, 0.78] : [0.22, 0.78]
+    end
 
     def self.add_line(bom, key, qty, unit, subs = {})
       return if qty.nil? || qty.to_f <= 0.0
@@ -164,7 +180,7 @@ module K2A
         v_start = centre - total * 0.5
         v_end = centre + total * 0.5
 
-        [0.22, 0.78].each do |ratio|
+        rail_ratios(cfg).each do |ratio|
           plan.each { |len| add_line(bom, "railPiece.#{profile}", 1, 'шт', 'len' => len.round) }
           add_line(bom, "splice.#{profile}", plan.length - 1, 'шт')
           bom[:kg] += total / 1000.0 * RAIL_KG_PER_M[profile] + (plan.length - 1) * SPLICE_KG[profile]
@@ -187,7 +203,7 @@ module K2A
             place_def(ents, geom, mid_def, tag_clamps, line_u, (stack[i][:v1] + stack[i + 1][:v0]) * 0.5, base_z)
           end
           add_line(bom, "clampP.#{profile}", stack.length - 1, 'шт', t_sub)
-          bom[:kg] += (stack.length + 1) * PART_KG[:clamp]
+          bom[:kg] += clamps_kg(profile, stack.length - 1)
 
           anchors = bracket_positions(v_start + 120.0, v_end - 120.0, step)
           unless anchor == 'screw'
@@ -196,7 +212,7 @@ module K2A
           end
           add_line(bom, "anchor.#{anchor}", anchors.length, 'шт')
           add_line(bom, 'tape', anchors.length * SCREW_TAPE_M, 'м') if anchor == 'screw'
-          bom[:kg] += anchors.length * PART_KG[:anchor_tbit] if anchor == 'tbit'
+          bom[:kg] += anchors.length * ANCHOR_KG[anchor] if ANCHOR_KG[anchor]
         end
       end
     end
@@ -235,7 +251,7 @@ module K2A
           u_end = centre + total * 0.5
           v0 = seg.first[:v0]
 
-          [0.22, 0.78].each do |ratio|
+          rail_ratios(cfg).each do |ratio|
             plan.each { |len| add_line(bom, "railPiece.#{profile}", 1, 'шт', 'len' => len.round) }
             add_line(bom, "splice.#{profile}", plan.length - 1, 'шт')
             bom[:kg] += total / 1000.0 * RAIL_KG_PER_M[profile] + (plan.length - 1) * SPLICE_KG[profile]
@@ -264,7 +280,7 @@ module K2A
               place_def(ents, geom, mid_def, tag_clamps, (seg[i][:u1] + seg[i + 1][:u0]) * 0.5, line_v, z_top, tr_tilt)
             end
             add_line(bom, "clampP.#{profile}", seg.length - 1, 'шт', t_sub)
-            bom[:kg] += (seg.length + 1) * PART_KG[:clamp]
+            bom[:kg] += clamps_kg(profile, seg.length - 1)
 
             anchors = bracket_positions(u_start + 120.0, u_end - 120.0, step)
             unless anchor == 'screw' # саморезы в профнастил — кронштейна нет
@@ -275,7 +291,7 @@ module K2A
             end
             add_line(bom, "anchor.#{anchor}", anchors.length, 'шт')
             add_line(bom, 'tape', anchors.length * SCREW_TAPE_M, 'м') if anchor == 'screw'
-            bom[:kg] += anchors.length * PART_KG[:anchor_tbit] if anchor == 'tbit'
+            bom[:kg] += anchors.length * ANCHOR_KG[anchor] if ANCHOR_KG[anchor]
           end
         end
       end

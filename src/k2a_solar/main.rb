@@ -9,7 +9,7 @@ require_relative 'mounting'
 
 module K2A
   module SolarPlanner
-    VERSION = '1.10.1'
+    VERSION = '1.10.2'
     # Ключи данных прежние (были до переименования в K2A): по ним живут уже сделанные модели и настройки
     ATTR_DICT = 'SolarTools_SolarPlanner'
     # Скат с уклоном меньше этого считается плоской кровлей: направление рядов задаётся режимом
@@ -232,6 +232,7 @@ module K2A
       rail_profile     = params['railProfile'].to_s == 'g41' ? 'g41' : 'al_ld'
       anchor_type      = %w[l45 tbit ubit falz hook screw].include?(params['anchorType'].to_s) ? params['anchorType'].to_s : 'l45'
       rail_dir         = params['railDir'].to_s == 'across' ? 'across' : 'along'
+      rail_lines       = params['railLines'].to_i == 3 ? 3 : 2
       rows_per_strip   = [[params['rowsPerStrip'].to_i, 1].max, 10].min
       aisle_mm         = [params['aisleMm'].to_f, 0.0].max
       include_mounting = params['includeMounting'] == true
@@ -511,6 +512,7 @@ module K2A
             'profile' => rail_profile,
             'anchor' => anchor_type,
             'railDir' => rail_dir,
+            'railLines' => rail_lines,
             'rowsPerStrip' => rows_per_strip,
             'aisleMm' => aisle_mm,
             'includeMounting' => include_mounting,
@@ -773,6 +775,7 @@ module K2A
         'profile' => params['railProfile'].to_s == 'g41' ? 'g41' : 'al_ld',
         'anchor' => %w[l45 tbit ubit falz hook screw].include?(params['anchorType'].to_s) ? params['anchorType'].to_s : 'l45',
         'railDir' => params['railDir'].to_s == 'across' ? 'across' : 'along',
+        'railLines' => params['railLines'].to_i == 3 ? 3 : 2,
         'bracketStepMm' => [params['bracketStepMm'].to_f, 300.0].max,
         'railOverhangMm' => [params['railOverhangMm'].to_f, 0.0].max,
         'standoffMm' => [params['standoffMm'].to_f, 20.0].max,
