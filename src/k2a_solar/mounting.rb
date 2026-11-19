@@ -49,6 +49,11 @@ module K2A
       cfg['railLines'].to_i == 3 ? [0.22, 0.5, 0.78] : [0.22, 0.78]
     end
 
+    # Кронштейн L45: нержавеющий под алюминиевый профиль, оцинкованный под G41 (прайс RUDNIK)
+    def self.anchor_subs(anchor, profile)
+      anchor == 'l45' ? { 'mat' => profile == 'g41' ? 'оц' : 'нерж' } : {}
+    end
+
     def self.add_line(bom, key, qty, unit, subs = {})
       return if qty.nil? || qty.to_f <= 0.0
 
@@ -136,7 +141,7 @@ module K2A
         'panelModel' => cfg['panelModel'],
         'panelSize' => cfg['panelSize'],
         'orientation' => cfg['orientation'],
-        'mountType' => SYSTEM_LABELS[cfg['mount']] || cfg['mount'].to_s,
+        'mountType' => cfg['includeMounting'] ? (SYSTEM_LABELS[cfg['mount']] || cfg['mount'].to_s) : 'без крепежа',
         'panelsCount' => panels,
         'rowGapMm' => cfg['rowGapMm'].to_f.round,
         'localTiltDeg' => cfg['localTiltDeg'].to_f.round(1),
@@ -210,7 +215,7 @@ module K2A
             scale = Geom::Transformation.scaling(1.0, 1.0, [(base_z - rail_h) / 100.0, 0.2].max)
             anchors.each { |av| place_def(ents, geom, bracket_def, tag_brackets, line_u, av, 0.0, scale) }
           end
-          add_line(bom, "anchor.#{anchor}", anchors.length, 'шт')
+          add_line(bom, "anchor.#{anchor}", anchors.length, 'шт', anchor_subs(anchor, profile))
           add_line(bom, 'tape', anchors.length * SCREW_TAPE_M, 'м') if anchor == 'screw'
           bom[:kg] += anchors.length * ANCHOR_KG[anchor] if ANCHOR_KG[anchor]
         end
@@ -289,7 +294,7 @@ module K2A
                 place_def(ents, geom, bracket_def, tag_brackets, bu, line_v, 0.0, scale)
               end
             end
-            add_line(bom, "anchor.#{anchor}", anchors.length, 'шт')
+            add_line(bom, "anchor.#{anchor}", anchors.length, 'шт', anchor_subs(anchor, profile))
             add_line(bom, 'tape', anchors.length * SCREW_TAPE_M, 'м') if anchor == 'screw'
             bom[:kg] += anchors.length * ANCHOR_KG[anchor] if ANCHOR_KG[anchor]
           end
@@ -563,7 +568,8 @@ module K2A
       model = Sketchup.active_model
       summary = {
         'arraysCount' => 0, 'panelsCount' => 0, 'powerKw' => 0.0, 'structureKg' => 0.0,
-        'staleCount' => 0, 'legacyCount' => 0, 'items' => [], 'lines' => []
+        'staleCount' => 0, 'legacyCount' => 0, 'items' => [], 'lines' => [],
+        'costUsd' => 0.0, 'unpriced' => []
       }
       return summary unless model
 
@@ -590,6 +596,8 @@ module K2A
       end
 
       nom = load_nomenclature
+      prices = load_prices
+      factor = price_factor
       order = nom.keys
       merged = merge_lines(all_lines).sort_by do |l|
         [order.index(l['key']) || 999, l['subs'].to_a.map { |_, v| v.to_s.rjust(8, '0') }.join]
@@ -603,9 +611,50 @@ module K2A
           note = note.gsub("{#{k}}", v.to_s)
         end
         qty = l['qty'].is_a?(Float) ? l['qty'].round(2) : l['qty']
-        { 'name' => name, 'note' => note, 'qty' => qty, 'unit' => l['unit'] }
+        unit_price, cost, price_note = line_price(l, prices)
+        if cost
+          cost *= factor
+          unit_price *= factor
+          summary['costUsd'] += cost
+        else
+          summary['unpriced'] << name
+        end
+        { 'name' => name, 'note' => note, 'qty' => qty, 'unit' => l['unit'],
+          'price' => unit_price && unit_price.round(2), 'cost' => cost && cost.round(2), 'priceNote' => price_note }
       end
+      summary['costUsd'] = summary['costUsd'].round(2)
+      summary['priceFactor'] = factor
+      summary['priceSource'] = prices['_source'].to_s
       summary
+    end
+
+    # Цена строки спецификации по prices.json: [цена за единицу строки, сумма, пояснение] или nil.
+    def self.line_price(line, prices)
+      entry = prices[line['key']]
+      return nil unless entry.is_a?(Hash)
+
+      subs = line['subs'] || {}
+      p = entry['price']
+      if entry['by']
+        v = subs[entry['by']]
+        v = v.to_i if v.is_a?(Float) && v == v.round # угол 15.0 -> «15»
+        p = (entry['prices'] || {})[v.to_s]
+      end
+      return nil unless p.is_a?(Numeric)
+
+      qty = line['qty'].to_f
+      if entry['per'].to_s == 'м'
+        if subs['len']
+          unit = p * subs['len'].to_f / 1000.0
+          return [unit, unit * qty, nil]
+        end
+        if entry['pack'].to_f.positive?
+          packs = (qty / entry['pack'].to_f).ceil
+          return [p, packs * p, "#{packs} рул. по #{entry['pack'].to_f.round} м"]
+        end
+        return [p, p * qty, nil]
+      end
+      [p.to_f, p * qty, nil]
     end
 
     def self.export_bom_to_csv
@@ -623,15 +672,22 @@ module K2A
       File.open(save_path, 'wb:UTF-8') do |file|
         file.write("﻿")
         csv = CSV.new(file, col_sep: ';')
-        csv << ['Позиция', 'Характеристика / Модель', 'Количество', 'Ед. изм.']
+        csv << ['Позиция', 'Характеристика / Модель', 'Количество', 'Ед. изм.', 'Цена, $', 'Сумма, $']
         bom['items'].each do |item|
           csv << ["Солнечная панель (#{item['groupName']})",
                   "#{item['panelModel']} (#{item['panelSize']}, #{item['orientation']}), #{item['mountType']}",
                   item['panelsCount'], 'шт']
         end
         csv << ['Суммарная мощность', 'Все массивы в модели', bom['powerKw'], 'кВт']
-        bom['lines'].each { |l| csv << [l['name'], l['note'], l['qty'], l['unit']] }
-        csv << ['Масса конструкции', 'Крепёж и балластные блоки, только детали с известной массой; без панелей', bom['structureKg'], 'кг']
+        bom['lines'].each do |l|
+          note = [l['note'], l['priceNote']].reject { |x| x.to_s.empty? }.join('; ')
+          csv << [l['name'], note, l['qty'], l['unit'], l['price'] || 'нет в прайсе', l['cost'] || '']
+        end
+        unless bom['lines'].empty?
+          csv << ['Масса конструкции', 'Крепёж и балластные блоки, только детали с известной массой; без панелей', bom['structureKg'], 'кг']
+          factor_note = bom['priceFactor'] == 1.0 ? '' : ", коэффициент #{bom['priceFactor']}"
+          csv << ['Стоимость крепежа', "#{bom['priceSource']}#{factor_note}; позиции без цены не входят", '', '', '', bom['costUsd']]
+        end
         if bom['legacyCount'].positive?
           csv << ['ВНИМАНИЕ', "Массивов старых версий без состава крепежа: #{bom['legacyCount']} — пересоберите крепёж", '', '']
         end

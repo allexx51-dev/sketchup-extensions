@@ -9,7 +9,7 @@ require_relative 'mounting'
 
 module K2A
   module SolarPlanner
-    VERSION = '1.10.2'
+    VERSION = '1.11.0'
     # Ключи данных прежние (были до переименования в K2A): по ним живут уже сделанные модели и настройки
     ATTR_DICT = 'SolarTools_SolarPlanner'
     # Скат с уклоном меньше этого считается плоской кровлей: направление рядов задаётся режимом
@@ -17,6 +17,7 @@ module K2A
     # Шаг просмотра ряда вдоль u при поиске свободных участков
     SCAN_STEP_MM = 50.0
     PANEL_DEF_PREFIX = 'PV_Panel_'
+    PREFS_KEY = 'SolarTools_SolarPlanner'
     @dialog = nil
 
     unless file_loaded?(__FILE__)
@@ -90,6 +91,23 @@ module K2A
           nil
         end
         rebuild_selected_arrays(params)
+      end
+      @dialog.add_action_callback('set_location') do |_ctx, json_payload|
+        begin
+          set_location(JSON.parse(json_payload.to_s))
+        rescue StandardError => e
+          UI.messagebox("Ошибка при записи координат:\n#{e.message}")
+        end
+      end
+      @dialog.add_action_callback('north_from_edge') { |_ctx| north_from_edge }
+      @dialog.add_action_callback('import_prices') { |_ctx| import_prices }
+      @dialog.add_action_callback('save_ui_mode') do |_ctx, mode|
+        Sketchup.write_default(PREFS_KEY, 'uiMode', mode.to_s == 'layout' ? 'layout' : 'full')
+      end
+      @dialog.add_action_callback('set_price_factor') do |_ctx, value|
+        f = value.to_s.tr(',', '.').to_f
+        Sketchup.write_default(PREFS_KEY, 'priceFactor', f.positive? ? f.to_s : '1.0')
+        send_model_bom
       end
 
       @dialog.show
@@ -221,7 +239,7 @@ module K2A
       gap_u_mm      = [params['gapUMm'].to_f, 0.0].max
       row_gap_mode  = params['rowGapMode'].to_s
       manual_gap_v  = [params['gapVMm'].to_f, 0.0].max
-      latitude_deg  = params['latitudeDeg'].to_f
+      latitude_deg  = params['latitudeDeg'].is_a?(Numeric) ? params['latitudeDeg'].to_f : model.shadow_info['Latitude'].to_f
       margin_mm     = [params['edgeMarginMm'].to_f, 0.0].max
       obs_clear_mm  = [params['obstacleClearanceMm'].to_f, 0.0].max
       tilt_mode     = params['tiltMode'].to_s
@@ -643,9 +661,61 @@ module K2A
     # Названия позиций: встроенный файл — основа, файл пользователя перекрывает.
     # Устаревший файл пользователя (меньший номер версии) сохраняется как .bak и заменяется новым.
     def self.load_nomenclature
-      bundled_path = File.join(__dir__, 'nomenclature.json')
+      load_versioned_config('nomenclature.json')
+    end
+
+    # Цены: встроенный prices.json — пустой шаблон, цены — в файле пользователя.
+    # Файл пользователя при обновлении расширения не заменяется никогда.
+    def self.load_prices
+      bundled = JSON.parse(File.read(File.join(__dir__, 'prices.json'), encoding: 'UTF-8'))
+      user_path = File.join(config_dir, 'prices.json')
+      return bundled unless File.exist?(user_path)
+
+      bundled.merge(JSON.parse(File.read(user_path, encoding: 'UTF-8')))
+    rescue StandardError => e
+      puts "[K2A Солнечные панели] prices.json: #{e.message}"
+      {}
+    end
+
+    # Загрузить прайс: выбранный файл копируется в папку настроек как prices.json, прежний — в .bak
+    def self.import_prices
+      path = UI.openpanel('Файл цен K2A (prices.json)', '', 'Цены JSON|*.json||')
+      return unless path
+
+      data = JSON.parse(File.read(path, encoding: 'UTF-8'))
+      raise 'в файле нет позиций' unless data.is_a?(Hash)
+
+      priced = data.count do |k, v|
+        next false if k.start_with?('_') || !v.is_a?(Hash)
+
+        v['price'].is_a?(Numeric) || (v['prices'].is_a?(Hash) && v['prices'].values.any? { |x| x.is_a?(Numeric) })
+      end
+      raise 'в файле нет ни одной цены' if priced.zero?
+
+      dest = File.join(config_dir, 'prices.json')
+      if File.exist?(dest)
+        bak = "#{dest}.bak"
+        File.delete(bak) if File.exist?(bak)
+        File.rename(dest, bak)
+      end
+      File.write(dest, JSON.pretty_generate(data), encoding: 'UTF-8')
+      src = data['_source'].to_s.empty? ? File.basename(path) : data['_source']
+      send_report(["Загружен прайс: #{src}, позиций с ценой: #{priced}. Файл: #{dest}"])
+      send_model_bom
+    rescue StandardError => e
+      UI.messagebox("Прайс не загружен:\n#{e.message}")
+    end
+
+    # Коэффициент к прайсу (скидка, наценка, курс) — из окна, хранится в настройках SketchUp
+    def self.price_factor
+      f = Sketchup.read_default(PREFS_KEY, 'priceFactor', '1.0').to_s.to_f
+      f.positive? ? f : 1.0
+    end
+
+    def self.load_versioned_config(name)
+      bundled_path = File.join(__dir__, name)
       bundled = JSON.parse(File.read(bundled_path, encoding: 'UTF-8'))
-      user_path = config_file('nomenclature.json')
+      user_path = config_file(name)
       return bundled if user_path == bundled_path
 
       user = JSON.parse(File.read(user_path, encoding: 'UTF-8'))
@@ -658,7 +728,7 @@ module K2A
       end
       bundled.merge(user)
     rescue StandardError => e
-      puts "[K2A Солнечные панели] nomenclature.json: #{e.message}"
+      puts "[K2A Солнечные панели] #{name}: #{e.message}"
       {}
     end
 
@@ -671,12 +741,86 @@ module K2A
       si = model.shadow_info
       info = {
         'georeferenced' => model.georeferenced?,
-        'latitude' => si['Latitude'].to_f.round(2),
+        'locationKnown' => model.georeferenced? || model.get_attribute(ATTR_DICT, 'locationSet') == true,
+        'latitude' => si['Latitude'].to_f.round(5),
+        'longitude' => si['Longitude'].to_f.round(5),
         'northAngle' => si['NorthAngle'].to_f.round(1),
+        'uiMode' => Sketchup.read_default(PREFS_KEY, 'uiMode', 'full').to_s,
+        'priceFactor' => price_factor,
         'panels' => load_json_config('panels.json', []),
         'configDir' => config_dir
       }
       @dialog.execute_script("window.setModelInfo(#{JSON.generate(info)});")
+    end
+
+    # ---------- Объект: координаты и север ----------
+
+    # Широта, долгота и север пишутся в настройки солнца модели (ShadowInfo):
+    # по ним SketchUp строит тени, а расстановка — зазор рядов по солнцу и ряды по сторонам света.
+    def self.set_location(params)
+      model = Sketchup.active_model
+      return unless model
+
+      lat = params['latitude']
+      lon = params['longitude']
+      north = params['northAngle'].to_f % 360.0
+      report = []
+      model.start_operation('Координаты и север объекта', true)
+      si = model.shadow_info
+      if lat.is_a?(Numeric) && lat.abs <= 90.0
+        si['Latitude'] = lat.to_f
+        report << format('Широта %.5f°', lat)
+      else
+        report << 'Широта не задана — не изменена'
+      end
+      if lon.is_a?(Numeric) && lon.abs <= 180.0
+        si['Longitude'] = lon.to_f
+        report << format('долгота %.5f°', lon)
+      else
+        report << 'долгота не задана — не изменена'
+      end
+      si['NorthAngle'] = north
+      begin
+        si['DisplayNorth'] = true
+      rescue StandardError
+        nil
+      end
+      report << format('север %.1f°', north)
+      model.set_attribute(ATTR_DICT, 'locationSet', true) if lat.is_a?(Numeric) && lon.is_a?(Numeric)
+      model.commit_operation
+      send_report(["Записано в модель: #{report.join(', ')}.",
+                   'Стоящие массивы не перестраиваются: если ряды ставились по солнцу или по сторонам света — разместите заново.'])
+      send_model_info
+    end
+
+    # Север по выделенной линии: направление от начала линии к концу (в плане).
+    def self.north_from_edge
+      model = Sketchup.active_model
+      return unless model
+
+      edge = model.selection.grep(Sketchup::Edge).first
+      unless edge
+        UI.messagebox('Проведите линию с юга на север (например, по стрелке на подложке), выделите её и нажмите «Север по линии».')
+        return
+      end
+      tr = model.edit_transform
+      vec = edge.end.position.transform(tr) - edge.start.position.transform(tr)
+      if Math.hypot(vec.x, vec.y) < 1.0e-6
+        UI.messagebox('Линия вертикальная — направление в плане не определить.')
+        return
+      end
+      north = (Math.atan2(vec.x, vec.y) * 180.0 / Math::PI) % 360.0
+      model.start_operation('Север по линии', true)
+      model.shadow_info['NorthAngle'] = north
+      begin
+        model.shadow_info['DisplayNorth'] = true
+      rescue StandardError
+        nil
+      end
+      model.commit_operation
+      send_report([format('Север модели: %.1f° — по линии от её начала к концу. Если стрелка севера в модели смотрит на юг — «Север +180°».', north),
+                   'Стоящие массивы не перестраиваются: если ряды ставились по солнцу или по сторонам света — разместите заново.'])
+      send_model_info
     end
 
     def self.send_report(lines)
@@ -769,6 +913,8 @@ module K2A
     # Настройки крепежа из окна, которые меняются без перерасстановки панелей.
     # Ограничения — те же, что при расстановке (place_solar_arrays).
     def self.mount_settings(params)
+      return { 'includeMounting' => false } if params['layoutOnly'] == true
+
       {
         'mount' => %w[ballast ballast_ew ground block].include?(params['mountType'].to_s) ? params['mountType'].to_s : 'rail_clamp',
         'includeMounting' => params['includeMounting'] == true,
@@ -849,7 +995,7 @@ module K2A
         arrays.each do |grp|
           if settings
             cfg = array_cfg(grp)
-            problem = cfg && mount_switch_problem(cfg, settings['mount'])
+            problem = cfg && settings['mount'] && mount_switch_problem(cfg, settings['mount'])
             if problem
               report << "#{grp.name}: не пересобран — #{problem}. Разместите массив заново (выделите скат, «Разместить» заменит панели)."
               next
@@ -857,6 +1003,10 @@ module K2A
             old_mount = cfg['mount'].to_s
             apply_mount_settings(grp, cfg, settings) if cfg
             rebuild_array(model, grp)
+            if settings['mount'].nil?
+              report << "Пересчитан без крепежа: #{grp.name}"
+              next
+            end
             changed = old_mount == settings['mount'] ? '' : " (система: #{SYSTEM_LABELS[settings['mount']]})"
             report << "Пересобран крепёж по настройкам окна: #{grp.name}#{changed}"
           else

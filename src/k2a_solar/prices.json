@@ -1,0 +1,121 @@
+{
+  "_version": 1,
+  "_comment": "Цены позиций спецификации, $ за единицу. Здесь цифр нет: файл с ценами загружается кнопкой «Загрузить прайс…» в окне и хранится в папке настроек пользователя; обновление расширения его не затирает. Ключи — как в nomenclature.json. per: м — за метр (у отрезков профиля цена умножается на длину отрезка); pack — длина рулона в метрах, считается целыми рулонами. by — цена зависит от подстановки (angle — угол треугольника, mat — нерж/оц). Позиции с price: null в сумму не входят.",
+  "_source": "",
+  "railPiece.al_ld": {
+    "price": null,
+    "per": "м"
+  },
+  "railPiece.g41": {
+    "price": null,
+    "per": "м"
+  },
+  "splice.al_ld": {
+    "price": null
+  },
+  "splice.g41": {
+    "price": null
+  },
+  "clampZ.al_ld": {
+    "price": null
+  },
+  "clampP.al_ld": {
+    "price": null
+  },
+  "clampZ.g41": {
+    "price": null
+  },
+  "clampP.g41": {
+    "price": null
+  },
+  "anchor.l45": {
+    "by": "mat",
+    "prices": {
+      "нерж": null,
+      "оц": null
+    }
+  },
+  "anchor.tbit": {
+    "price": null
+  },
+  "anchor.ubit": {
+    "price": null
+  },
+  "anchor.falz": {
+    "price": null
+  },
+  "anchor.hook": {
+    "price": null
+  },
+  "tape": {
+    "price": null,
+    "per": "м",
+    "pack": 10
+  },
+  "block": {
+    "price": null
+  },
+  "clampZ.block": {
+    "price": null
+  },
+  "clampP.block": {
+    "price": null
+  },
+  "rivet": {
+    "price": null
+  },
+  "triangle": {
+    "by": "angle",
+    "prices": {
+      "15": null,
+      "20": null
+    }
+  },
+  "triangleEW": {
+    "by": "angle",
+    "prices": {
+      "15": null,
+      "20": null
+    }
+  },
+  "clampZ.bal": {
+    "price": null
+  },
+  "clampW.bal": {
+    "price": null
+  },
+  "spoiler": {
+    "price": null
+  },
+  "rowConnector": {
+    "price": null
+  },
+  "rowConnectorEW": {
+    "price": null
+  },
+  "ballast": {
+    "price": null
+  },
+  "ground.frame": {
+    "price": null
+  },
+  "ground.embed": {
+    "price": null
+  },
+  "ground.purlin": {
+    "price": null,
+    "per": "м"
+  },
+  "ground.splice": {
+    "price": null
+  },
+  "ground.brace": {
+    "price": null
+  },
+  "clampZ.ground": {
+    "price": null
+  },
+  "clampP.ground": {
+    "price": null
+  }
+}
