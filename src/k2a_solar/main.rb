@@ -9,7 +9,7 @@ require_relative 'mounting'
 
 module K2A
   module SolarPlanner
-    VERSION = '1.11.1'
+    VERSION = '1.11.2'
     # Ключи данных прежние (были до переименования в K2A): по ним живут уже сделанные модели и настройки
     ATTR_DICT = 'SolarTools_SolarPlanner'
     # Скат с уклоном меньше этого считается плоской кровлей: направление рядов задаётся режимом
@@ -632,8 +632,18 @@ module K2A
 
     # Папка настроек пользователя. Файлы в ней не затираются при обновлении расширения.
     # Имя папки прежнее: в ней уже лежат база панелей и названия позиций пользователя.
+    # Пути Windows приходят в кодировке системы (Windows-1251 при кириллице в имени пользователя
+    # или папки) — приводим к UTF-8, иначе склейка с русским текстом падает
+    def self.utf8(str)
+      s = str.to_s.dup
+      return s.force_encoding(Encoding::UTF_8) if s.encoding == Encoding::ASCII_8BIT
+      return s if s.encoding == Encoding::UTF_8
+
+      s.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
+    end
+
     def self.config_dir
-      dir = File.join(ENV['APPDATA'] || Dir.home, 'SolarPlanner')
+      dir = File.join(utf8(ENV['APPDATA'] || Dir.home), 'SolarPlanner')
       Dir.mkdir(dir) unless Dir.exist?(dir)
       dir
     rescue StandardError
@@ -682,6 +692,7 @@ module K2A
       path = UI.openpanel('Файл цен K2A (prices.json)', '', 'Цены JSON|*.json||')
       return unless path
 
+      path = utf8(path)
       data = JSON.parse(File.read(path, encoding: 'UTF-8'))
       raise 'в файле нет позиций' unless data.is_a?(Hash)
 
@@ -699,7 +710,7 @@ module K2A
         File.rename(dest, bak)
       end
       File.write(dest, JSON.pretty_generate(data), encoding: 'UTF-8')
-      src = data['_source'].to_s.empty? ? File.basename(path) : data['_source']
+      src = utf8(data['_source'].to_s.empty? ? File.basename(path) : data['_source'])
       send_report(["Загружен прайс: #{src}, позиций с ценой: #{priced}. Файл: #{dest}"])
       send_model_bom
     rescue StandardError => e
